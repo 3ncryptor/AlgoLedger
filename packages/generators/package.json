@@ -13,7 +13,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@algoledger/schemas": "workspace:*"
+    "@algoledger/schemas": "workspace:*",
+    "@algoledger/shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^6.0.3",

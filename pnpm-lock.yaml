@@ -152,6 +152,9 @@ importers:
       '@algoledger/schemas':
         specifier: workspace:*
         version: link:../schemas
+      '@algoledger/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       typescript:
         specifier: ^6.0.3
