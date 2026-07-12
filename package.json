@@ -1,0 +1,33 @@
+{
+  "name": "algoledger",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "AlgoLedger — automatically converts accepted competitive programming submissions into a structured, version-controlled GitHub knowledge repository.",
+  "packageManager": "pnpm@10.26.2",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint -- --fix",
+    "type-check": "turbo run type-check",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.10.4",
+    "typescript": "^6.0.3",
+    "prettier": "^3.9.5",
+    "eslint": "^9.39.5",
+    "@eslint/js": "^9.39.5",
+    "typescript-eslint": "^8.63.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-jsx-a11y": "^6.10.2"
+  }
+}
