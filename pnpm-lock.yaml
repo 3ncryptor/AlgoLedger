@@ -38,6 +38,9 @@ importers:
 
   apps/extension:
     dependencies:
+      '@algoledger/adapters':
+        specifier: workspace:*
+        version: link:../../packages/adapters
       '@algoledger/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
@@ -127,6 +130,9 @@ importers:
       '@algoledger/schemas':
         specifier: workspace:*
         version: link:../schemas
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: ^6.0.3

@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@algoledger/adapters": "workspace:*",
     "@algoledger/schemas": "workspace:*",
     "@algoledger/shared": "workspace:*",
     "@algoledger/ui": "workspace:*",

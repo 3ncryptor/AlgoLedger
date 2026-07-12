@@ -24,7 +24,7 @@ export default defineManifest({
   ],
   web_accessible_resources: [
     {
-      resources: ['src/injected/index.ts'],
+      resources: ['injected.js'],
       matches: ['https://leetcode.com/*'],
     },
   ],
