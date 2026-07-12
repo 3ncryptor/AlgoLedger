@@ -41,6 +41,9 @@ importers:
       '@algoledger/adapters':
         specifier: workspace:*
         version: link:../../packages/adapters
+      '@algoledger/github':
+        specifier: workspace:*
+        version: link:../../packages/github
       '@algoledger/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
@@ -56,6 +59,9 @@ importers:
       react-dom:
         specifier: ^19.2.7
         version: 19.2.7(react@19.2.7)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@crxjs/vite-plugin':
         specifier: ^2.7.1
@@ -159,6 +165,9 @@ importers:
       '@algoledger/schemas':
         specifier: workspace:*
         version: link:../schemas
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: ^6.0.3
