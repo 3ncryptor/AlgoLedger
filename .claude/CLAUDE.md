@@ -1,6 +1,6 @@
 # AlgoLedger — Project Instructions
 
-`buildPlan.md` at the repo root is the source of truth for architecture. If a request conflicts with it, `buildPlan.md` wins until intentionally updated (see its section 32).
+`buildPlan.md` at the repo root is the source of truth for architecture. If a request conflicts with it, `buildPlan.md` wins until intentionally updated (see its section 33).
 
 ## Monorepo
 

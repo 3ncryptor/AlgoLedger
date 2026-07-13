@@ -45,7 +45,7 @@ pnpm dev
 
 ## Coding Standards
 
-TypeScript everywhere, pnpm workspaces, Turborepo, ESLint + Prettier, Vitest. See `buildPlan.md` section 29 for the full standard.
+TypeScript everywhere, pnpm workspaces, Turborepo, ESLint + Prettier, Vitest. See `buildPlan.md` section 30 for the full standard.
 
 ## Claude Code Skills
 

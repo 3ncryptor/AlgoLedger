@@ -351,6 +351,23 @@ PAT may ONLY exist inside:
 
 ---
 
+## Storage Security Model
+
+`chrome.storage.local` is not encrypted at rest — it is a LevelDB file inside the Chrome profile directory. This protects the PAT from:
+
+* other websites
+* other browser extensions
+* the network (only ever sent to `api.github.com` over HTTPS)
+
+It does NOT protect the PAT from:
+
+* malware or another process running under the same OS user account
+* anyone with local DevTools access to the extension (Inspect popup/options)
+
+Mitigation: use a fine-grained PAT scoped to a single repository with an expiration date (see section 22), so a worst-case leak is bounded to "write access to one repo for N days," not full account access.
+
+---
+
 # 12. GitHub API Strategy
 
 ## REST API
@@ -373,6 +390,12 @@ Used For:
 * Heatmaps
 * Statistics
 * Repository reads
+
+---
+
+## Authentication
+
+REST and GraphQL share the same PAT and the same request headers (`Authorization: Bearer <token>`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version`). No separate credentials, OAuth App, or client secret are required — a PAT is a self-contained bearer credential, which is why V1 uses a PAT instead of a full GitHub OAuth App (an OAuth App would need a client secret and a backend token-exchange server, neither of which can live safely inside a browser extension).
 
 ---
 
@@ -661,7 +684,100 @@ No complex navigation.
 
 ---
 
-# 22. Sync Screen
+# 22. First-Time Onboarding Flow
+
+Purpose:
+
+Guide a brand-new user from "no GitHub connection" to "repository connected" exactly once.
+
+This is deliberately NOT part of the Popup (section 21 stays Quick Status Only — no configuration, no onboarding, no complex navigation).
+
+## Trigger
+
+* Opened automatically as a new browser tab on first install (`chrome.runtime.onInstalled`, reason `install`).
+* If the Popup is opened before onboarding has ever completed, its disconnected state links here instead of jumping straight to Settings.
+
+## Detection
+
+First-time state = no GitHub config saved in `chrome.storage.local`. There is no separate "onboarding complete" flag — once a config is saved, this flow never appears automatically again. Disconnecting in Settings naturally surfaces it again on the next popup open.
+
+## Step 1 — Connect GitHub
+
+```text
+┌──────────────────────────────────────┐
+│ Welcome to AlgoLedger                │
+│                                      │
+│ Personal Access Token                │
+│ [*********************]              │
+│                                      │
+│              [ Continue ]            │
+└──────────────────────────────────────┘
+```
+
+The token is validated with a lightweight authenticated GraphQL call (`viewer { login }`) before advancing.
+
+## Creating a Personal Access Token
+
+AlgoLedger's `GitHubClient` only ever calls repository-content and git-data endpoints (read repo metadata, read/write files, read/write blobs/trees/commits/refs) plus two read-only GraphQL queries (`viewer.login`, `viewer.repositories`). No Issues, Actions, Packages, or admin scopes are ever used.
+
+### Fine-grained token (recommended)
+
+1. GitHub → profile photo → Settings → Developer settings (bottom of sidebar) → Personal access tokens → Fine-grained tokens → Generate new token.
+2. Name: `AlgoLedger Extension`. Expiration: 90 days or a custom date (avoid "No expiration").
+3. Resource owner: the account or org that owns the target repository.
+4. Repository access: "Only select repositories" → the one repository AlgoLedger should commit to.
+5. Repository permissions: Contents → Read and write. Metadata → Read-only (auto-selected). Everything else → No access.
+6. Generate, copy the token immediately (shown once), paste it into the onboarding flow or Settings → GitHub tab.
+
+### Classic token (simpler, broader scope)
+
+1. Same path → Personal access tokens → Tokens (classic) → Generate new token (classic).
+2. Name: `AlgoLedger Extension`. Expiration: 30/60/90 days.
+3. Scopes: check only `repo`.
+4. Generate, copy, paste into AlgoLedger.
+
+Trade-off: classic tokens cannot be scoped to a single repository — checking `repo` grants read/write to every repository (public and private) the account can access. Fine-grained tokens trade a slightly longer setup for a much smaller blast radius if the token ever leaks.
+
+## Step 2 — Choose Repository
+
+```text
+┌──────────────────────────────────────┐
+│ Choose a Repository                  │
+│                                      │
+│ [ Search repositories... ]           │
+│                                      │
+│ ○ aryanvibhuti/algoledger            │
+│ ○ aryanvibhuti/dsa-notes             │
+│ ○ aryanvibhuti/interview-prep        │
+│                                      │
+│              [ Continue ]            │
+└──────────────────────────────────────┘
+```
+
+Repositories the token can access are listed via the GitHub GraphQL API (`viewer.repositories`, cursor-paginated) — per section 12, repository reads are a GraphQL concern. V1 only lists existing repositories; it does not create new ones, matching the Repository Bootstrap contract (section 12), which throws if the repository does not exist rather than auto-creating it.
+
+## Step 3 — Confirm & Connect
+
+```text
+┌──────────────────────────────────────┐
+│ Confirm Connection                   │
+│                                      │
+│ Repository: aryanvibhuti/algoledger  │
+│ Branch:     main                     │
+│                                      │
+│              [ Connect ]             │
+└──────────────────────────────────────┘
+```
+
+"Connect" saves the PAT/owner/repo/branch to `chrome.storage.local` and runs Repository Bootstrap, then shows a success state before closing the onboarding tab.
+
+## After Onboarding
+
+Settings → GitHub tab (section 24) remains the only place to change the PAT or target repository afterward. Onboarding is not re-offered — Settings covers reconnecting or switching repositories.
+
+---
+
+# 23. Sync Screen
 
 ```text
 ┌──────────────────────────────────────┐
@@ -680,7 +796,7 @@ No complex navigation.
 
 ---
 
-# 23. Settings Screen
+# 24. Settings Screen
 
 ```text
 ┌─────────────────────────────────────────────┐
@@ -705,7 +821,7 @@ No complex navigation.
 
 ---
 
-# 24. Analytics Screen
+# 25. Analytics Screen
 
 ```text
 ┌─────────────────────────────────────────────┐
@@ -728,7 +844,7 @@ No complex navigation.
 
 ---
 
-# 25. Notification Screens
+# 26. Notification Screens
 
 ## Success
 
@@ -762,7 +878,7 @@ Click to Retry.
 
 ---
 
-# 26. Website Scope
+# 27. Website Scope
 
 Website Exists Only For:
 
@@ -772,7 +888,7 @@ Website Exists Only For:
 
 ---
 
-# 27. Landing Page Sections
+# 28. Landing Page Sections
 
 * Hero Section
 * Features
@@ -784,7 +900,7 @@ Website Exists Only For:
 
 ---
 
-# 28. Roadmap
+# 29. Roadmap
 
 ## V1
 
@@ -820,7 +936,7 @@ Website Exists Only For:
 
 ---
 
-# 29. Coding Standards
+# 30. Coding Standards
 
 ## Language
 
@@ -868,7 +984,7 @@ kebab-case for folders.
 
 ---
 
-# 30. Build Order
+# 31. Build Order
 
 ## Milestone 1
 
@@ -908,6 +1024,7 @@ kebab-case for folders.
 * Popup UI
 * Settings UI
 * Analytics UI
+* First-Time Onboarding Flow
 
 ---
 
@@ -927,7 +1044,7 @@ kebab-case for folders.
 
 ---
 
-# 31. Future Adapter Interface
+# 32. Future Adapter Interface
 
 ```ts
 interface PlatformAdapter {
@@ -943,7 +1060,7 @@ interface PlatformAdapter {
 
 ---
 
-# 32. Final Rule
+# 33. Final Rule
 
 If a feature request conflicts with this document:
 

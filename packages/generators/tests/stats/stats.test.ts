@@ -54,4 +54,18 @@ describe('updateStats', () => {
     expect(resubmit.totalSolved).toBe(1)
     expect(resubmit.byDifficulty.Easy).toBe(1)
   })
+
+  test('records activity for the day on every solve, including resubmits', () => {
+    const day1 = updateStats(EMPTY_STATS, 'Easy', '2026-07-13', true)
+    const resubmit = updateStats(day1, 'Easy', '2026-07-13', false)
+
+    expect(resubmit.activityByDate).toEqual({ '2026-07-13': 2 })
+  })
+
+  test('tracks activity independently across multiple days', () => {
+    const day1 = updateStats(EMPTY_STATS, 'Easy', '2026-07-13', true)
+    const day2 = updateStats(day1, 'Medium', '2026-07-14', true)
+
+    expect(day2.activityByDate).toEqual({ '2026-07-13': 1, '2026-07-14': 1 })
+  })
 })

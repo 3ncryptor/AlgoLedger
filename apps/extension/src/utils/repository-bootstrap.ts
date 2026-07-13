@@ -1,5 +1,6 @@
-import { GitHubClient, bootstrapRepository } from '@algoledger/github'
+import { bootstrapRepository } from '@algoledger/github'
 import { getGitHubConfig } from './config-storage'
+import { createGitHubClientFromConfig } from './github-client'
 
 export async function runRepositoryBootstrap(): Promise<void> {
   const config = await getGitHubConfig()
@@ -7,12 +8,5 @@ export async function runRepositoryBootstrap(): Promise<void> {
     throw new Error('GitHub is not configured yet. Set your PAT and repository in Settings first.')
   }
 
-  const client = new GitHubClient({
-    token: config.githubPat,
-    owner: config.repoOwner,
-    repo: config.repoName,
-    branch: config.branch,
-  })
-
-  await bootstrapRepository(client)
+  await bootstrapRepository(createGitHubClientFromConfig(config))
 }

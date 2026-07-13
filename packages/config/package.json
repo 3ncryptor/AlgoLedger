@@ -1,0 +1,8 @@
+{
+  "name": "@algoledger/config",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./theme/soft-motion-tokens.css": "./theme/soft-motion-tokens.css"
+  }
+}

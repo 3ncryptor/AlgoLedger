@@ -12,6 +12,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@algoledger/config": "workspace:*",
     "@algoledger/ui": "workspace:*",
     "next": "^16.2.10",
     "react": "^19.2.7",

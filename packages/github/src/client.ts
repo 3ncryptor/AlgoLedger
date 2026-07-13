@@ -39,6 +39,77 @@ const commitSchema = z.object({
 const blobSchema = z.object({ sha: z.string() })
 const treeSchema = z.object({ sha: z.string() })
 
+export interface ViewerInfo {
+  login: string
+}
+
+export interface RepositoryListItem {
+  name: string
+  owner: string
+  nameWithOwner: string
+  defaultBranch: string
+  isPrivate: boolean
+}
+
+export interface RepositoryListPage {
+  repositories: RepositoryListItem[]
+  hasNextPage: boolean
+  endCursor: string | null
+}
+
+const viewerSchema = z.object({
+  viewer: z.object({ login: z.string() }),
+})
+
+const repositoryListSchema = z.object({
+  viewer: z.object({
+    repositories: z.object({
+      nodes: z.array(
+        z.object({
+          name: z.string(),
+          nameWithOwner: z.string(),
+          owner: z.object({ login: z.string() }),
+          defaultBranchRef: z.object({ name: z.string() }).nullable(),
+          isPrivate: z.boolean(),
+        }),
+      ),
+      pageInfo: z.object({
+        hasNextPage: z.boolean(),
+        endCursor: z.string().nullable(),
+      }),
+    }),
+  }),
+})
+
+const LIST_REPOSITORIES_QUERY = `
+  query ListRepositories($after: String) {
+    viewer {
+      repositories(
+        first: 50
+        after: $after
+        affiliation: [OWNER, COLLABORATOR]
+        orderBy: { field: UPDATED_AT, direction: DESC }
+      ) {
+        nodes {
+          name
+          nameWithOwner
+          owner {
+            login
+          }
+          defaultBranchRef {
+            name
+          }
+          isPrivate
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  }
+`
+
 export class GitHubClient {
   constructor(private readonly config: GitHubClientConfig) {}
 
@@ -212,5 +283,27 @@ export class GitHubClient {
       throw new GitHubApiError('GraphQL response missing data', response.status)
     }
     return result.data
+  }
+
+  async getViewer(): Promise<ViewerInfo> {
+    const data = await this.graphqlRequest<unknown>('query { viewer { login } }')
+    return viewerSchema.parse(data).viewer
+  }
+
+  async listRepositories(after: string | null = null): Promise<RepositoryListPage> {
+    const data = await this.graphqlRequest<unknown>(LIST_REPOSITORIES_QUERY, { after })
+    const { nodes, pageInfo } = repositoryListSchema.parse(data).viewer.repositories
+
+    return {
+      repositories: nodes.map((node) => ({
+        name: node.name,
+        owner: node.owner.login,
+        nameWithOwner: node.nameWithOwner,
+        defaultBranch: node.defaultBranchRef?.name ?? 'main',
+        isPrivate: node.isPrivate,
+      })),
+      hasNextPage: pageInfo.hasNextPage,
+      endCursor: pageInfo.endCursor,
+    }
   }
 }

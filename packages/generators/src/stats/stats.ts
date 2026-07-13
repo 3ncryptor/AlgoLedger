@@ -6,6 +6,7 @@ export interface Stats {
   currentStreak: number
   longestStreak: number
   lastSolvedDate: string | null
+  activityByDate: Record<string, number>
 }
 
 export const EMPTY_STATS: Stats = {
@@ -14,6 +15,7 @@ export const EMPTY_STATS: Stats = {
   currentStreak: 0,
   longestStreak: 0,
   lastSolvedDate: null,
+  activityByDate: {},
 }
 
 function daysBetween(fromDate: string, toDate: string): number {
@@ -47,5 +49,9 @@ export function updateStats(
     currentStreak,
     longestStreak: Math.max(stats.longestStreak, currentStreak),
     lastSolvedDate: today,
+    activityByDate: {
+      ...stats.activityByDate,
+      [today]: (stats.activityByDate[today] ?? 0) + 1,
+    },
   }
 }

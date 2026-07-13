@@ -207,4 +207,109 @@ describe('GitHubClient', () => {
       )
     })
   })
+
+  describe('getViewer', () => {
+    test('returns the authenticated login on success', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { data: { viewer: { login: 'octocat' } } }))
+      const client = new GitHubClient(config)
+
+      await expect(client.getViewer()).resolves.toEqual({ login: 'octocat' })
+    })
+
+    test('throws if the response does not match the expected shape', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { data: { viewer: {} } }))
+      const client = new GitHubClient(config)
+
+      await expect(client.getViewer()).rejects.toThrow()
+    })
+  })
+
+  describe('listRepositories', () => {
+    test('maps GraphQL nodes into RepositoryListItem entries', async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(200, {
+          data: {
+            viewer: {
+              repositories: {
+                nodes: [
+                  {
+                    name: 'algoledger',
+                    nameWithOwner: 'aryanvibhuti/algoledger',
+                    owner: { login: 'aryanvibhuti' },
+                    defaultBranchRef: { name: 'main' },
+                    isPrivate: false,
+                  },
+                ],
+                pageInfo: { hasNextPage: true, endCursor: 'cursor-1' },
+              },
+            },
+          },
+        }),
+      )
+      const client = new GitHubClient(config)
+
+      await expect(client.listRepositories()).resolves.toEqual({
+        repositories: [
+          {
+            name: 'algoledger',
+            owner: 'aryanvibhuti',
+            nameWithOwner: 'aryanvibhuti/algoledger',
+            defaultBranch: 'main',
+            isPrivate: false,
+          },
+        ],
+        hasNextPage: true,
+        endCursor: 'cursor-1',
+      })
+    })
+
+    test('falls back to "main" when defaultBranchRef is null (empty repository)', async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(200, {
+          data: {
+            viewer: {
+              repositories: {
+                nodes: [
+                  {
+                    name: 'empty-repo',
+                    nameWithOwner: 'aryanvibhuti/empty-repo',
+                    owner: { login: 'aryanvibhuti' },
+                    defaultBranchRef: null,
+                    isPrivate: true,
+                  },
+                ],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        }),
+      )
+      const client = new GitHubClient(config)
+
+      const result = await client.listRepositories()
+
+      expect(result.repositories[0]?.defaultBranch).toBe('main')
+    })
+
+    test('passes the cursor through as the "after" GraphQL variable', async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(200, {
+          data: {
+            viewer: {
+              repositories: {
+                nodes: [],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        }),
+      )
+      const client = new GitHubClient(config)
+
+      await client.listRepositories('cursor-1')
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+      expect(JSON.parse(init.body as string).variables).toEqual({ after: 'cursor-1' })
+    })
+  })
 })

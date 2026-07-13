@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import {
-  clearGitHubConfig,
-  getGitHubConfig,
-  setGitHubConfig,
-} from '../../src/background/config-storage'
+import { clearGitHubConfig, getGitHubConfig, setGitHubConfig } from '../../src/utils/config-storage'
 
 function createChromeStorageMock() {
   const store = new Map<string, unknown>()

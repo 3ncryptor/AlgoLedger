@@ -12,12 +12,17 @@
   },
   "dependencies": {
     "@algoledger/adapters": "workspace:*",
+    "@algoledger/config": "workspace:*",
+    "@algoledger/generators": "workspace:*",
     "@algoledger/github": "workspace:*",
     "@algoledger/schemas": "workspace:*",
     "@algoledger/shared": "workspace:*",
     "@algoledger/ui": "workspace:*",
+    "framer-motion": "^12.42.2",
+    "lucide-react": "^1.24.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "sonner": "^2.0.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {

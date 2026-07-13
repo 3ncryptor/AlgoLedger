@@ -16,3 +16,6 @@ apps/web/next-env.d.ts
 
 # User's own source-of-truth doc, not ours to reflow
 buildPlan.md
+
+# User's own personal Claude Code skills, not ours to reflow
+.claude/skills/personal
