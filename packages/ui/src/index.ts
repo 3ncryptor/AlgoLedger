@@ -15,4 +15,16 @@ export { Progress } from './components/progress'
 export { Switch } from './components/switch'
 export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants } from './components/tabs'
 export { Toaster } from './components/sonner'
+export {
+  RetracingSvg,
+  RETRACE,
+  DRAW_IN,
+  type SvgTag,
+  type SvgElementAttrs,
+  type SvgElementDef,
+  type RetraceTrigger,
+  type AnimationDef,
+  type ChoreographyDef,
+  type RetracingSvgProps,
+} from './components/RetracingSvg'
 export { cn } from './lib/utils'

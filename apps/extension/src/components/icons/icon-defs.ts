@@ -1,4 +1,4 @@
-import type { SvgElementDef } from './RetracingSvg'
+import type { SvgElementDef } from '@algoledger/ui'
 
 export const DASHBOARD_ELEMENTS: SvgElementDef[] = [
   ['rect', { x: 3, y: 3, width: 8, height: 8, rx: 1.5, key: 'top-left' }],

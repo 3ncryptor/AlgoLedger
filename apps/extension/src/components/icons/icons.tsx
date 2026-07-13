@@ -1,3 +1,4 @@
+import { RetracingSvg } from '@algoledger/ui'
 import {
   DASHBOARD_ELEMENTS,
   EXTERNAL_LINK_ELEMENTS,
@@ -5,7 +6,6 @@ import {
   REPO_CONNECTED_ELEMENTS,
   SETTINGS_ELEMENTS,
 } from './icon-defs'
-import { RetracingSvg } from './RetracingSvg'
 
 interface IconProps {
   className?: string

@@ -14,6 +14,10 @@
   "dependencies": {
     "@algoledger/config": "workspace:*",
     "@algoledger/ui": "workspace:*",
+    "@gsap/react": "^2.1.2",
+    "framer-motion": "^12.42.2",
+    "gsap": "^3.15.0",
+    "lenis": "^1.3.25",
     "next": "^16.2.10",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"

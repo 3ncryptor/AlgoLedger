@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { CustomCursor } from '../components/CustomCursor'
+import { SmoothScrollProvider } from '../components/SmoothScrollProvider'
 import './globals.css'
 
 const DESCRIPTION =
@@ -32,8 +34,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className="dark">
+      <body className="bg-background text-foreground antialiased">
+        <CustomCursor />
+        <SmoothScrollProvider>{children}</SmoothScrollProvider>
+      </body>
     </html>
   )
 }
