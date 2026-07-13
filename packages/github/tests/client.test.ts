@@ -48,6 +48,26 @@ describe('GitHubClient', () => {
 
       await expect(client.repositoryExists()).rejects.toThrow(GitHubApiError)
     })
+
+    test("error message includes the status code and GitHub's own error text when present", async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(403, { message: 'Resource not accessible by personal access token' }),
+      )
+      const client = new GitHubClient(config)
+
+      await expect(client.repositoryExists()).rejects.toThrow(
+        'Failed to check repository (HTTP 403): Resource not accessible by personal access token',
+      )
+    })
+
+    test('error message falls back to just the status code when the body has no message field', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(500, {}))
+      const client = new GitHubClient(config)
+
+      await expect(client.repositoryExists()).rejects.toThrow(
+        'Failed to check repository (HTTP 500)',
+      )
+    })
   })
 
   describe('getFile', () => {
@@ -174,8 +194,106 @@ describe('GitHubClient', () => {
       expect(JSON.parse(refUpdateInit.body as string)).toEqual({ sha: 'new-commit-sha' })
     })
 
-    test('throws GitHubApiError if the branch ref cannot be fetched', async () => {
-      fetchMock.mockResolvedValueOnce(jsonResponse(404, {}))
+    test('creates the first file via the Contents API when the repository is empty (404 ref)', async () => {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(404, {})) // GET ref -> no commits exist yet
+        .mockResolvedValueOnce(jsonResponse(201, {})) // PUT contents for the first file
+
+      const client = new GitHubClient(config)
+
+      await client.commitFiles(
+        [{ path: 'README.md', content: '# Hello' }],
+        'chore: bootstrap repository structure',
+      )
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      const [putUrl, putInit] = fetchMock.mock.calls[1] as [string, RequestInit]
+      expect(putUrl).toBe('https://api.github.com/repos/algoledger/algoledger/contents/README.md')
+      expect(putInit.method).toBe('PUT')
+      const putBody = JSON.parse(putInit.body as string)
+      expect(putBody).toEqual({
+        message: 'chore: bootstrap repository structure',
+        content: encodeBase64('# Hello'),
+        branch: 'main',
+      })
+    })
+
+    test('creates the first file via the Contents API when GitHub reports the repo as empty (409 ref)', async () => {
+      // GitHub's real-world behavior for a genuinely brand-new repository: 409 "Git Repository
+      // is empty.", not 404. Both must take the same empty-repo bootstrap path.
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(409, { message: 'Git Repository is empty.' }))
+        .mockResolvedValueOnce(jsonResponse(201, {}))
+
+      const client = new GitHubClient(config)
+
+      await client.commitFiles(
+        [{ path: 'README.md', content: '# Hello' }],
+        'chore: bootstrap repository structure',
+      )
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      const [putUrl, putInit] = fetchMock.mock.calls[1] as [string, RequestInit]
+      expect(putUrl).toBe('https://api.github.com/repos/algoledger/algoledger/contents/README.md')
+      expect(putInit.method).toBe('PUT')
+    })
+
+    test('commits the first file via the Contents API then the rest via the Git Data API when empty', async () => {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(404, {})) // GET ref -> empty repo
+        .mockResolvedValueOnce(jsonResponse(201, {})) // PUT contents for the first file
+        .mockResolvedValueOnce(jsonResponse(200, { object: { sha: 'base-commit-sha' } })) // recursive commitFiles: ref now exists
+        .mockResolvedValueOnce(
+          jsonResponse(200, { sha: 'base-commit-sha', tree: { sha: 'base-tree-sha' } }),
+        )
+        .mockResolvedValueOnce(jsonResponse(201, { sha: 'blob-sha-1' }))
+        .mockResolvedValueOnce(jsonResponse(201, { sha: 'new-tree-sha' }))
+        .mockResolvedValueOnce(
+          jsonResponse(201, { sha: 'new-commit-sha', tree: { sha: 'new-tree-sha' } }),
+        )
+        .mockResolvedValueOnce(jsonResponse(200, {}))
+
+      const client = new GitHubClient(config)
+
+      await client.commitFiles(
+        [
+          { path: 'README.md', content: '# Hello' },
+          { path: '.internal/stats.json', content: '{}\n' },
+        ],
+        'chore: bootstrap repository structure',
+      )
+
+      expect(fetchMock).toHaveBeenCalledTimes(8)
+
+      const [firstUrl, firstInit] = fetchMock.mock.calls[1] as [string, RequestInit]
+      expect(firstUrl).toBe('https://api.github.com/repos/algoledger/algoledger/contents/README.md')
+      expect(firstInit.method).toBe('PUT')
+
+      const [secondRefUrl] = fetchMock.mock.calls[2] as [string]
+      expect(secondRefUrl).toBe(
+        'https://api.github.com/repos/algoledger/algoledger/git/ref/heads/main',
+      )
+
+      const [, blobInit] = fetchMock.mock.calls[4] as [string, RequestInit]
+      expect(JSON.parse(blobInit.body as string)).toEqual({
+        content: encodeBase64('{}\n'),
+        encoding: 'base64',
+      })
+    })
+
+    test('throws GitHubApiError if the branch ref check fails for a reason other than an empty repository', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(500, {}))
+      const client = new GitHubClient(config)
+
+      await expect(client.commitFiles([{ path: 'a.md', content: 'x' }], 'msg')).rejects.toThrow(
+        GitHubApiError,
+      )
+    })
+
+    test('throws GitHubApiError if creating the initial file fails', async () => {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(404, {}))
+        .mockResolvedValueOnce(jsonResponse(422, {}))
       const client = new GitHubClient(config)
 
       await expect(client.commitFiles([{ path: 'a.md', content: 'x' }], 'msg')).rejects.toThrow(

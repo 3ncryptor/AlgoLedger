@@ -1,0 +1,30 @@
+/*
+ * GitHub dark-mode palette, shared by every extension surface (popup, onboarding, options).
+ * Scoped to apps/extension only — never touches packages/config's tokens, which apps/web also
+ * imports. Overrides packages/ui's neutral .dark background/border/card tokens with GitHub's
+ * real canvas colors; --primary stays achromatic (packages/ui's .dark already sets it to
+ * oklch(0.922 0 0), i.e. near-white, not blue) so the accent reads as monochrome/black-and-white
+ * per the requested theme.
+ */
+.dark {
+  --background: #0d1117;
+  --foreground: #e6edf3;
+  --card: #161b22;
+  --card-foreground: #e6edf3;
+  --popover: #161b22;
+  --popover-foreground: #e6edf3;
+  --muted: #21262d;
+  --muted-foreground: #7d8590;
+  --accent: #21262d;
+  --accent-foreground: #e6edf3;
+  --border: #30363d;
+  --input: #30363d;
+}
+
+@theme inline {
+  --color-heatmap-0: #2d333b;
+  --color-heatmap-1: #234d2e;
+  --color-heatmap-2: #2f6d3c;
+  --color-heatmap-3: #4caf5a;
+  --color-heatmap-4: #9be9a8;
+}

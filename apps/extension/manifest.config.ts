@@ -30,7 +30,7 @@ export default defineManifest({
   content_scripts: [
     {
       matches: ['https://leetcode.com/*'],
-      js: ['src/content/index.ts'],
+      js: ['src/content/bridge.ts'],
       run_at: 'document_start',
     },
   ],

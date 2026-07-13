@@ -19,6 +19,7 @@ describe('fetchRepositoryState', () => {
     expect(state.topicIndex).toEqual({})
     expect(state.languageIndex).toEqual({})
     expect(state.platformIndex).toEqual({})
+    expect(state.problemIndex).toEqual([])
   })
 
   test('parses existing metadata for the given folder', async () => {
@@ -63,7 +64,7 @@ describe('fetchRepositoryState', () => {
     expect(state.existingMetadata).toBeNull()
   })
 
-  test('parses stats, topic index, language index, and platform index together', async () => {
+  test('parses stats, topic index, language index, platform index, and problem index together', async () => {
     const stats = {
       totalSolved: 1,
       byDifficulty: { Easy: 1, Medium: 0, Hard: 0 },
@@ -72,6 +73,19 @@ describe('fetchRepositoryState', () => {
       lastSolvedDate: '2026-07-13',
       activityByDate: { '2026-07-13': 1 },
     }
+
+    const problemIndex = [
+      {
+        folderId: 'leetcode/0001-two-sum',
+        frontendId: '1',
+        title: 'Two Sum',
+        slug: 'two-sum',
+        difficulty: 'Easy',
+        topics: ['Array'],
+        language: 'python3',
+        acceptedAt: '2026-07-13T00:00:00.000Z',
+      },
+    ]
 
     const client = createClientMock({
       '.internal/stats.json': { sha: 's1', content: `${JSON.stringify(stats)}\n` },
@@ -87,6 +101,10 @@ describe('fetchRepositoryState', () => {
         sha: 's4',
         content: `${JSON.stringify({ leetcode: ['leetcode/0001-two-sum'] })}\n`,
       },
+      '.internal/problem-index.json': {
+        sha: 's5',
+        content: `${JSON.stringify(problemIndex)}\n`,
+      },
     })
 
     const state = await fetchRepositoryState(client, 'leetcode/0001-two-sum')
@@ -95,5 +113,6 @@ describe('fetchRepositoryState', () => {
     expect(state.topicIndex).toEqual({ Array: ['leetcode/0001-two-sum'] })
     expect(state.languageIndex).toEqual({ python3: ['leetcode/0001-two-sum'] })
     expect(state.platformIndex).toEqual({ leetcode: ['leetcode/0001-two-sum'] })
+    expect(state.problemIndex).toEqual(problemIndex)
   })
 })

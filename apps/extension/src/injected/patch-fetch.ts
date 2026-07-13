@@ -6,6 +6,7 @@ export interface InterceptedExchange {
 }
 
 export type ExchangeHandler = (exchange: InterceptedExchange) => void
+export type UrlFilter = (url: string) => boolean
 
 function safeParseJson(text: string): unknown {
   try {
@@ -15,15 +16,23 @@ function safeParseJson(text: string): unknown {
   }
 }
 
-export function patchFetch(onExchange: ExchangeHandler): void {
+export function patchFetch(onExchange: ExchangeHandler, shouldIntercept: UrlFilter): void {
   const originalFetch = window.fetch.bind(window)
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const response = await originalFetch(input, init)
 
     try {
-      const url =
-        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      // response.url is always the fully-resolved absolute URL (redirect-final), unlike the raw
+      // `input` argument, which is frequently a page-relative path (e.g. "/problems/two-sum/
+      // submit/") — matching against that directly silently failed every downstream check that
+      // expects an absolute https://leetcode.com/... URL.
+      const url = response.url
+
+      // Skip the expensive clone+read for the vast majority of page traffic (analytics, ads,
+      // unrelated API calls) that could never be a submit/check/graphql exchange.
+      if (!shouldIntercept(url)) return response
+
       const method = (
         init?.method ?? (input instanceof Request ? input.method : 'GET')
       ).toUpperCase()

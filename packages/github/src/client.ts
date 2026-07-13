@@ -87,7 +87,8 @@ const LIST_REPOSITORIES_QUERY = `
       repositories(
         first: 50
         after: $after
-        affiliation: [OWNER, COLLABORATOR]
+        affiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR]
+        ownerAffiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR]
         orderBy: { field: UPDATED_AT, direction: DESC }
       ) {
         nodes {
@@ -126,14 +127,38 @@ export class GitHubClient {
     })
   }
 
+  /**
+   * `response.statusText` is frequently empty in practice (HTTP/2, which api.github.com uses,
+   * has no textual reason phrase, and Chrome's fetch() often returns "" for it) — relying on it
+   * alone produced unhelpful errors like "Failed to get branch ref: ". This always includes the
+   * numeric status and, when the body is GitHub's standard `{ message, documentation_url }` JSON
+   * error shape, that message too.
+   */
+  private async throwApiError(action: string, response: Response): Promise<never> {
+    let detail: string | null = null
+    try {
+      const body: unknown = await response.json()
+      if (
+        body &&
+        typeof body === 'object' &&
+        'message' in body &&
+        typeof body.message === 'string'
+      ) {
+        detail = body.message
+      }
+    } catch {
+      // Body wasn't JSON (or was already consumed) — fall back to status only.
+    }
+
+    const suffix = detail ? `: ${detail}` : ''
+    throw new GitHubApiError(`${action} (HTTP ${response.status})${suffix}`, response.status)
+  }
+
   async repositoryExists(): Promise<boolean> {
     const response = await this.request(`/repos/${this.config.owner}/${this.config.repo}`)
     if (response.status === 404) return false
     if (!response.ok) {
-      throw new GitHubApiError(
-        `Failed to check repository: ${response.statusText}`,
-        response.status,
-      )
+      await this.throwApiError('Failed to check repository', response)
     }
     return true
   }
@@ -144,10 +169,7 @@ export class GitHubClient {
     )
     if (response.status === 404) return null
     if (!response.ok) {
-      throw new GitHubApiError(
-        `Failed to get file "${path}": ${response.statusText}`,
-        response.status,
-      )
+      await this.throwApiError(`Failed to get file "${path}"`, response)
     }
 
     const data = fileContentSchema.parse(await response.json())
@@ -166,10 +188,18 @@ export class GitHubClient {
       },
     )
     if (!response.ok) {
-      throw new GitHubApiError(
-        `Failed to delete file "${path}": ${response.statusText}`,
-        response.status,
-      )
+      await this.throwApiError(`Failed to delete file "${path}"`, response)
+    }
+  }
+
+  private async createInitialFile(file: CommitFile, message: string): Promise<void> {
+    const { owner, repo, branch } = this.config
+    const response = await this.request(`/repos/${owner}/${repo}/contents/${file.path}`, {
+      method: 'PUT',
+      body: JSON.stringify({ message, content: encodeBase64(file.content), branch }),
+    })
+    if (!response.ok) {
+      await this.throwApiError(`Failed to create initial file "${file.path}"`, response)
     }
   }
 
@@ -179,11 +209,26 @@ export class GitHubClient {
     const { owner, repo, branch } = this.config
 
     const refResponse = await this.request(`/repos/${owner}/${repo}/git/ref/heads/${branch}`)
+
+    if (refResponse.status === 404 || refResponse.status === 409) {
+      // Truly empty repository: no commits exist yet, so there is no ref for the Git Data API
+      // to build on, and GitHub does not allow creating one out of thin air. GitHub returns 409
+      // ("Git Repository is empty.") for a brand-new repo with zero commits, or 404 if the
+      // specific branch just doesn't exist yet on an otherwise non-empty repo — both need the
+      // same fix. GitHub's own guide says to establish the first commit (and the branch) via
+      // the Contents API instead, then continue with any remaining files as a normal Git Data
+      // API commit.
+      const firstFile = files[0]!
+      const restFiles = files.slice(1)
+      await this.createInitialFile(firstFile, message)
+      if (restFiles.length > 0) {
+        await this.commitFiles(restFiles, message)
+      }
+      return
+    }
+
     if (!refResponse.ok) {
-      throw new GitHubApiError(
-        `Failed to get branch ref: ${refResponse.statusText}`,
-        refResponse.status,
-      )
+      await this.throwApiError('Failed to get branch ref', refResponse)
     }
     const ref = refSchema.parse(await refResponse.json())
     const baseCommitSha = ref.object.sha
@@ -192,10 +237,7 @@ export class GitHubClient {
       `/repos/${owner}/${repo}/git/commits/${baseCommitSha}`,
     )
     if (!commitResponse.ok) {
-      throw new GitHubApiError(
-        `Failed to get base commit: ${commitResponse.statusText}`,
-        commitResponse.status,
-      )
+      await this.throwApiError('Failed to get base commit', commitResponse)
     }
     const baseCommit = commitSchema.parse(await commitResponse.json())
 
@@ -206,10 +248,7 @@ export class GitHubClient {
           body: JSON.stringify({ content: encodeBase64(file.content), encoding: 'base64' }),
         })
         if (!blobResponse.ok) {
-          throw new GitHubApiError(
-            `Failed to create blob for "${file.path}": ${blobResponse.statusText}`,
-            blobResponse.status,
-          )
+          await this.throwApiError(`Failed to create blob for "${file.path}"`, blobResponse)
         }
         const blob = blobSchema.parse(await blobResponse.json())
         return { path: file.path, sha: blob.sha }
@@ -229,10 +268,7 @@ export class GitHubClient {
       }),
     })
     if (!treeResponse.ok) {
-      throw new GitHubApiError(
-        `Failed to create tree: ${treeResponse.statusText}`,
-        treeResponse.status,
-      )
+      await this.throwApiError('Failed to create tree', treeResponse)
     }
     const tree = treeSchema.parse(await treeResponse.json())
 
@@ -241,10 +277,7 @@ export class GitHubClient {
       body: JSON.stringify({ message, tree: tree.sha, parents: [baseCommitSha] }),
     })
     if (!newCommitResponse.ok) {
-      throw new GitHubApiError(
-        `Failed to create commit: ${newCommitResponse.statusText}`,
-        newCommitResponse.status,
-      )
+      await this.throwApiError('Failed to create commit', newCommitResponse)
     }
     const newCommit = commitSchema.parse(await newCommitResponse.json())
 
@@ -256,10 +289,7 @@ export class GitHubClient {
       },
     )
     if (!updateRefResponse.ok) {
-      throw new GitHubApiError(
-        `Failed to update branch ref: ${updateRefResponse.statusText}`,
-        updateRefResponse.status,
-      )
+      await this.throwApiError('Failed to update branch ref', updateRefResponse)
     }
   }
 
@@ -269,7 +299,7 @@ export class GitHubClient {
       body: JSON.stringify({ query, variables }),
     })
     if (!response.ok) {
-      throw new GitHubApiError(`GraphQL request failed: ${response.statusText}`, response.status)
+      await this.throwApiError('GraphQL request failed', response)
     }
 
     const result = (await response.json()) as { data?: T; errors?: Array<{ message: string }> }

@@ -1,35 +1,44 @@
 import { useEffect, useState } from 'react'
+import type { NameIndex, Stats } from '@algoledger/generators'
 import { Button, Toaster } from '@algoledger/ui'
 import { getGitHubConfig } from '../utils/config-storage'
 import { createGitHubClientFromConfig } from '../utils/github-client'
 import { folderIdToTitle } from '../utils/folder-id'
-import { getLastSevenDays } from '../utils/heatmap'
+import { getContributionGrid, type ContributionGrid } from '../utils/heatmap'
 import { fetchRemoteStats } from '../utils/stats-storage'
 import {
   SYNC_PROGRESS_STORAGE_KEY,
   getSyncProgress,
   type SyncProgressState,
 } from '../utils/sync-progress'
+import { KnowledgeGraphPage } from './KnowledgeGraphPage'
+import { Navbar, type PopupPage } from './Navbar'
 import { PopupDashboard } from './PopupDashboard'
+import { PopupSkeleton } from './PopupSkeleton'
 import { SyncScreen } from './SyncScreen'
+import { TopBar } from './TopBar'
 
 const RECENT_SYNCS_LIMIT = 3
+
+interface ReadyData {
+  repoOwner: string
+  repoName: string
+  branch: string
+  totalSolved: number
+  byDifficulty: Stats['byDifficulty']
+  currentStreak: number
+  longestStreak: number
+  recentSyncs: { folderId: string; title: string }[]
+  contributionGrid: ContributionGrid
+  topicIndex: NameIndex
+}
 
 type PopupState =
   | { status: 'not-configured' }
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'syncing'; sync: SyncProgressState }
-  | {
-      status: 'ready'
-      repoOwner: string
-      repoName: string
-      totalSolved: number
-      currentStreak: number
-      longestStreak: number
-      recentSyncTitles: string[]
-      heatmapDays: ReturnType<typeof getLastSevenDays>
-    }
+  | ({ status: 'ready' } & ReadyData)
 
 function capitalize(value: string): string {
   return value.length > 0 ? value[0]!.toUpperCase() + value.slice(1) : value
@@ -37,6 +46,7 @@ function capitalize(value: string): string {
 
 export function Popup() {
   const [state, setState] = useState<PopupState>({ status: 'loading' })
+  const [page, setPage] = useState<PopupPage>('dashboard')
 
   useEffect(() => {
     let cancelled = false
@@ -56,12 +66,12 @@ export function Popup() {
 
       try {
         const client = createGitHubClientFromConfig(config)
-        const { stats, platformIndex } = await fetchRemoteStats(client)
+        const { stats, topicIndex, platformIndex } = await fetchRemoteStats(client)
 
-        const recentSyncTitles = (platformIndex.leetcode ?? [])
+        const recentSyncs = (platformIndex.leetcode ?? [])
           .slice(-RECENT_SYNCS_LIMIT)
           .reverse()
-          .map(folderIdToTitle)
+          .map((folderId) => ({ folderId, title: folderIdToTitle(folderId) }))
 
         const today = new Date().toISOString().slice(0, 10)
 
@@ -70,11 +80,14 @@ export function Popup() {
             status: 'ready',
             repoOwner: config.repoOwner,
             repoName: config.repoName,
+            branch: config.branch,
             totalSolved: stats.totalSolved,
+            byDifficulty: stats.byDifficulty,
             currentStreak: stats.currentStreak,
             longestStreak: stats.longestStreak,
-            recentSyncTitles,
-            heatmapDays: getLastSevenDays(today, stats.activityByDate),
+            recentSyncs,
+            contributionGrid: getContributionGrid(today, stats.activityByDate),
+            topicIndex,
           })
         }
       } catch (error) {
@@ -108,11 +121,9 @@ export function Popup() {
   }, [])
 
   return (
-    <main className="w-80 p-4 font-sans">
-      <h1 className="mb-3 text-lg font-semibold">AlgoLedger</h1>
-
+    <main className="h-[640px] w-[480px] overflow-y-auto font-sans">
       {state.status === 'not-configured' && (
-        <>
+        <div className="p-4">
           <p className="text-sm text-muted-foreground">Repository not connected yet.</p>
           <Button
             className="mt-4 w-full"
@@ -122,35 +133,49 @@ export function Popup() {
           >
             Get Started
           </Button>
-        </>
+        </div>
       )}
 
-      {state.status === 'loading' && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {state.status === 'loading' && <PopupSkeleton />}
 
       {state.status === 'error' && (
-        <p className="text-sm text-destructive">Could not load stats: {state.message}</p>
+        <p className="p-4 text-sm text-destructive">Could not load stats: {state.message}</p>
       )}
 
       {state.status === 'syncing' && (
-        <SyncScreen
-          problem={state.sync.problemTitle}
-          platform={capitalize(state.sync.platform)}
-          language={capitalize(state.sync.language)}
-          progress={state.sync.progress}
-          statusText={state.sync.stage}
-        />
+        <div className="p-4">
+          <SyncScreen
+            problem={state.sync.problemTitle}
+            platform={capitalize(state.sync.platform)}
+            language={capitalize(state.sync.language)}
+            progress={state.sync.progress}
+            statusText={state.sync.stage}
+          />
+        </div>
       )}
 
       {state.status === 'ready' && (
-        <PopupDashboard
-          repoOwner={state.repoOwner}
-          repoName={state.repoName}
-          totalSolved={state.totalSolved}
-          currentStreak={state.currentStreak}
-          longestStreak={state.longestStreak}
-          recentSyncTitles={state.recentSyncTitles}
-          heatmapDays={state.heatmapDays}
-        />
+        <>
+          <TopBar repoOwner={state.repoOwner} repoName={state.repoName} />
+          <Navbar page={page} onNavigate={setPage} />
+
+          {page === 'dashboard' && (
+            <PopupDashboard
+              repoOwner={state.repoOwner}
+              repoName={state.repoName}
+              branch={state.branch}
+              totalSolved={state.totalSolved}
+              byDifficulty={state.byDifficulty}
+              currentStreak={state.currentStreak}
+              longestStreak={state.longestStreak}
+              recentSyncs={state.recentSyncs}
+              contributionGrid={state.contributionGrid}
+              topicIndex={state.topicIndex}
+            />
+          )}
+
+          {page === 'knowledge' && <KnowledgeGraphPage topicIndex={state.topicIndex} />}
+        </>
       )}
 
       <Toaster />

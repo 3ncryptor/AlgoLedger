@@ -10,7 +10,7 @@ function jsonFile(files: { path: string; content: string }[], path: string): unk
 }
 
 describe('planAcceptedSubmission', () => {
-  test('produces a "solve" commit with README, metadata, solution, and all four stats/index files for a brand new problem', () => {
+  test('produces a "solve" commit with README, metadata, solution, all stats/index files, and the LeetCode index README for a brand new problem', () => {
     const plan = planAcceptedSubmission(
       'leetcode',
       twoSumProblem,
@@ -30,6 +30,8 @@ describe('planAcceptedSubmission', () => {
       '.internal/topic-index.json',
       '.internal/language-index.json',
       '.internal/platform-index.json',
+      '.internal/problem-index.json',
+      'leetcode/README.md',
     ])
 
     const stats = jsonFile(plan.commitFiles, '.internal/stats.json') as {
@@ -50,6 +52,44 @@ describe('planAcceptedSubmission', () => {
       string[]
     >
     expect(languageIndex.python3).toEqual(['leetcode/0001-two-sum'])
+
+    const problemIndex = jsonFile(plan.commitFiles, '.internal/problem-index.json') as {
+      folderId: string
+      title: string
+      difficulty: string
+    }[]
+    expect(problemIndex).toEqual([
+      {
+        folderId: 'leetcode/0001-two-sum',
+        frontendId: '1',
+        title: 'Two Sum',
+        slug: 'two-sum',
+        difficulty: 'Easy',
+        topics: ['Array', 'Hash Table'],
+        language: 'python3',
+        acceptedAt: '2026-07-13T10:00:00.000Z',
+      },
+    ])
+
+    const leetcodeReadme = plan.commitFiles.find(
+      (file) => file.path === 'leetcode/README.md',
+    )!.content
+    expect(leetcodeReadme).toContain('[Two Sum](0001-two-sum/README.md)')
+    expect(leetcodeReadme).toContain('**1** problems solved')
+  })
+
+  test('does not emit a LeetCode index README for a non-LeetCode platform', () => {
+    const plan = planAcceptedSubmission(
+      'codeforces',
+      twoSumProblem,
+      acceptedSubmission,
+      EMPTY_REPOSITORY_STATE,
+      '2026-07-13T10:00:00.000Z',
+    )
+
+    expect(plan.commitFiles.map((file) => file.path)).not.toContain('leetcode/README.md')
+    // The cross-platform problem index is still maintained regardless of platform.
+    expect(plan.commitFiles.map((file) => file.path)).toContain('.internal/problem-index.json')
   })
 
   test('produces an "update" commit and does not double-count stats when the same problem is resubmitted', () => {
@@ -73,6 +113,18 @@ describe('planAcceptedSubmission', () => {
       topicIndex: { Array: ['leetcode/0001-two-sum'], 'Hash Table': ['leetcode/0001-two-sum'] },
       languageIndex: { python3: ['leetcode/0001-two-sum'] },
       platformIndex: { leetcode: ['leetcode/0001-two-sum'] },
+      problemIndex: [
+        {
+          folderId: 'leetcode/0001-two-sum',
+          frontendId: '1',
+          title: 'Two Sum',
+          slug: 'two-sum',
+          difficulty: 'Easy' as const,
+          topics: ['Array', 'Hash Table'],
+          language: 'python3',
+          acceptedAt: '2026-07-13T10:00:00.000Z',
+        },
+      ],
     }
 
     const plan = planAcceptedSubmission(
@@ -97,6 +149,10 @@ describe('planAcceptedSubmission', () => {
       version: number
     }
     expect(metadata.version).toBe(2)
+
+    // Resubmitting the same problem updates its index entry in place, not a duplicate.
+    const problemIndex = jsonFile(plan.commitFiles, '.internal/problem-index.json') as unknown[]
+    expect(problemIndex).toHaveLength(1)
   })
 
   test('deletes the old solution file and moves the language index entry when the language changes', () => {
@@ -120,6 +176,18 @@ describe('planAcceptedSubmission', () => {
       topicIndex: { Array: ['leetcode/0001-two-sum'], 'Hash Table': ['leetcode/0001-two-sum'] },
       languageIndex: { python3: ['leetcode/0001-two-sum'] },
       platformIndex: { leetcode: ['leetcode/0001-two-sum'] },
+      problemIndex: [
+        {
+          folderId: 'leetcode/0001-two-sum',
+          frontendId: '1',
+          title: 'Two Sum',
+          slug: 'two-sum',
+          difficulty: 'Easy' as const,
+          topics: ['Array', 'Hash Table'],
+          language: 'python3',
+          acceptedAt: '2026-07-13T10:00:00.000Z',
+        },
+      ],
     }
 
     const cppSubmission = {
@@ -147,5 +215,10 @@ describe('planAcceptedSubmission', () => {
     >
     expect(languageIndex.python3).toBeUndefined()
     expect(languageIndex.cpp).toEqual(['leetcode/0001-two-sum'])
+
+    const problemIndex = jsonFile(plan.commitFiles, '.internal/problem-index.json') as {
+      language: string
+    }[]
+    expect(problemIndex[0]!.language).toBe('cpp')
   })
 })

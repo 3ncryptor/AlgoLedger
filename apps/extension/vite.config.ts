@@ -15,12 +15,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        injected: 'src/injected/index.ts',
         onboarding: 'src/onboarding/index.html',
-      },
-      output: {
-        entryFileNames: (chunkInfo) =>
-          chunkInfo.name === 'injected' ? 'injected.js' : 'assets/[name]-[hash].js',
       },
     },
   },

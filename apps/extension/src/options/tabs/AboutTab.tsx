@@ -1,4 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@algoledger/ui'
+import { ExternalLinkIcon } from '../../components/icons/icons'
 import { Reveal } from '../../components/Reveal'
 
 export function AboutTab() {
@@ -20,8 +21,9 @@ export function AboutTab() {
             href="https://github.com/3ncryptor/AlgoLedger"
             target="_blank"
             rel="noreferrer"
-            className="text-primary underline underline-offset-4"
+            className="flex w-fit items-center gap-1.5 text-primary underline underline-offset-4"
           >
+            <ExternalLinkIcon className="size-3.5" />
             View source on GitHub
           </a>
         </CardContent>

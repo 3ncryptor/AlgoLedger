@@ -1,3 +1,4 @@
 @import '@algoledger/ui/styles.css';
 @import '@algoledger/config/theme/soft-motion-tokens.css';
+@import '../styles/github-dark-theme.css';
 @source '../../../../packages/ui/src/**/*.{ts,tsx}';
