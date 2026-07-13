@@ -1,15 +1,32 @@
-import type { SyncStatus } from '@algoledger/shared'
+import { parseSyncNotificationId } from '../notifications'
 import { isAcceptedSubmissionMessage } from '../types/messages'
-import { enqueueAcceptedSubmission } from './queue'
-
-export const INITIAL_SYNC_STATUS: SyncStatus = 'pending'
+import {
+  enqueueAndSync,
+  parseRetryAlarmName,
+  resumePendingQueueItems,
+  retryQueueItemNow,
+} from './sync-engine'
 
 chrome.runtime.onMessage.addListener((message: unknown) => {
   if (!isAcceptedSubmissionMessage(message)) return
-  void enqueueAcceptedSubmission(message)
+  void enqueueAndSync(message)
 })
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason !== 'install') return
   void chrome.tabs.create({ url: chrome.runtime.getURL('src/onboarding/index.html') })
+})
+
+chrome.runtime.onStartup.addListener(() => {
+  void resumePendingQueueItems()
+})
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  const itemId = parseRetryAlarmName(alarm.name)
+  if (itemId) void retryQueueItemNow(itemId)
+})
+
+chrome.notifications.onClicked.addListener((notificationId) => {
+  const itemId = parseSyncNotificationId(notificationId)
+  if (itemId) void retryQueueItemNow(itemId)
 })

@@ -5,7 +5,13 @@ import { createGitHubClientFromConfig } from '../utils/github-client'
 import { folderIdToTitle } from '../utils/folder-id'
 import { getLastSevenDays } from '../utils/heatmap'
 import { fetchRemoteStats } from '../utils/stats-storage'
+import {
+  SYNC_PROGRESS_STORAGE_KEY,
+  getSyncProgress,
+  type SyncProgressState,
+} from '../utils/sync-progress'
 import { PopupDashboard } from './PopupDashboard'
+import { SyncScreen } from './SyncScreen'
 
 const RECENT_SYNCS_LIMIT = 3
 
@@ -13,6 +19,7 @@ type PopupState =
   | { status: 'not-configured' }
   | { status: 'loading' }
   | { status: 'error'; message: string }
+  | { status: 'syncing'; sync: SyncProgressState }
   | {
       status: 'ready'
       repoOwner: string
@@ -24,6 +31,10 @@ type PopupState =
       heatmapDays: ReturnType<typeof getLastSevenDays>
     }
 
+function capitalize(value: string): string {
+  return value.length > 0 ? value[0]!.toUpperCase() + value.slice(1) : value
+}
+
 export function Popup() {
   const [state, setState] = useState<PopupState>({ status: 'loading' })
 
@@ -31,6 +42,12 @@ export function Popup() {
     let cancelled = false
 
     async function load() {
+      const syncProgress = await getSyncProgress()
+      if (syncProgress) {
+        if (!cancelled) setState({ status: 'syncing', sync: syncProgress })
+        return
+      }
+
       const config = await getGitHubConfig()
       if (!config) {
         if (!cancelled) setState({ status: 'not-configured' })
@@ -69,8 +86,24 @@ export function Popup() {
     }
 
     load()
+
+    function handleStorageChange(changes: Record<string, chrome.storage.StorageChange>) {
+      if (!(SYNC_PROGRESS_STORAGE_KEY in changes)) return
+
+      const newValue = changes[SYNC_PROGRESS_STORAGE_KEY]?.newValue as SyncProgressState | undefined
+
+      if (newValue) {
+        setState({ status: 'syncing', sync: newValue })
+      } else if (!cancelled) {
+        // The sync just finished (success or failure) — reload the dashboard.
+        load()
+      }
+    }
+
+    chrome.storage.onChanged.addListener(handleStorageChange)
     return () => {
       cancelled = true
+      chrome.storage.onChanged.removeListener(handleStorageChange)
     }
   }, [])
 
@@ -96,6 +129,16 @@ export function Popup() {
 
       {state.status === 'error' && (
         <p className="text-sm text-destructive">Could not load stats: {state.message}</p>
+      )}
+
+      {state.status === 'syncing' && (
+        <SyncScreen
+          problem={state.sync.problemTitle}
+          platform={capitalize(state.sync.platform)}
+          language={capitalize(state.sync.language)}
+          progress={state.sync.progress}
+          statusText={state.sync.stage}
+        />
       )}
 
       {state.status === 'ready' && (

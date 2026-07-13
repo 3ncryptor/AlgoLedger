@@ -6,9 +6,16 @@ interface SyncScreenProps {
   platform: string
   language: string
   progress: number
+  statusText?: string
 }
 
-export function SyncScreen({ problem, platform, language, progress }: SyncScreenProps) {
+export function SyncScreen({
+  problem,
+  platform,
+  language,
+  progress,
+  statusText = 'Updating Repository...',
+}: SyncScreenProps) {
   return (
     <Reveal>
       <Card>
@@ -32,7 +39,7 @@ export function SyncScreen({ problem, platform, language, progress }: SyncScreen
 
           <Progress value={progress} />
 
-          <span className="text-xs text-muted-foreground">Updating Repository...</span>
+          <span className="text-xs text-muted-foreground">{statusText}</span>
         </CardContent>
       </Card>
     </Reveal>

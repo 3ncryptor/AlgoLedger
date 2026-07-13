@@ -1,23 +1,10 @@
-import { EMPTY_NAME_INDEX, EMPTY_STATS, type NameIndex, type Stats } from '@algoledger/generators'
+import { EMPTY_STATS, type NameIndex, type Stats } from '@algoledger/generators'
 import type { GitHubClient } from '@algoledger/github'
+import { safeParseJson, toNameIndex } from './safe-json'
 
 const STATS_PATH = '.internal/stats.json'
 const TOPIC_INDEX_PATH = '.internal/topic-index.json'
 const PLATFORM_INDEX_PATH = '.internal/platform-index.json'
-
-function safeParseJson(content: string): unknown {
-  try {
-    return JSON.parse(content)
-  } catch {
-    return null
-  }
-}
-
-function toNameIndex(parsed: unknown): NameIndex {
-  return parsed && typeof parsed === 'object'
-    ? { ...EMPTY_NAME_INDEX, ...parsed }
-    : EMPTY_NAME_INDEX
-}
 
 export interface RemoteStats {
   stats: Stats

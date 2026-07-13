@@ -613,6 +613,18 @@ Generate notification.
 
 ---
 
+## Implementation Notes
+
+Each queued submission is a `QueueItem` (`background/queue.ts`) carrying `phase`, `attemptsInPhase`, and `status`, persisted in `chrome.storage.local` so retry state survives the background service worker being terminated between attempts. `background/retry-engine.ts`'s `decideNextRetry(phase, attemptsInPhase)` is a pure function implementing the phase table above; `background/sync-engine.ts` is the orchestrator that calls it after every failed commit attempt.
+
+* Phase 1's 5 attempts run back-to-back within one execution (a short in-memory sleep between attempts, no `chrome.alarms` needed — they're expected to resolve in seconds).
+* Phases 2 and 3 use `chrome.alarms` (one alarm per queue item, named `algoledger:retry:{itemId}`) specifically because MV3 service workers can be killed while idle — an alarm is what wakes the worker back up after 30 minutes / 2 hours to retry.
+* All sync attempts (new submission, alarm fire, manual retry, startup resume) are serialized through a single promise chain, so at most one commit is ever in flight — concurrent commits to the same branch would race on the same base ref.
+* If GitHub isn't configured yet (onboarding incomplete), an item stays `pending` and does not consume retry attempts.
+* A "Sync Failed" notification's "Click to Retry" (section 26) resets the item to phase 1 / attempt 0 before retrying, giving a fresh full retry cycle rather than immediately re-failing on exhausted attempts.
+
+---
+
 # 20. Extension Permissions
 
 ```json
@@ -796,6 +808,16 @@ Settings → GitHub tab (section 24) remains the only place to change the PAT or
 
 ---
 
+## Implementation Notes
+
+Popup is a separate document that opens and closes independently of the background service worker running the actual sync, so it can't hold sync progress in memory — it's bridged through `chrome.storage.local` (`utils/sync-progress.ts`, key `algoledger:current-sync`).
+
+* `background/sync-engine.ts`'s `commitSubmission` reports three stages as it works: "Fetching repository state..." (25%), "Preparing commit..." (50%), "Updating Repository..." (75%). The state is cleared as soon as the attempt finishes, whether it succeeds or fails.
+* `Popup.tsx` reads the current sync state on mount and also subscribes to `chrome.storage.onChanged`, so it switches to the Sync Screen live if a sync starts while the popup happens to already be open, and switches back to the Dashboard the moment it clears.
+* Retry-waiting (phase 2/3) and failed states are NOT shown as the Sync Screen — those are surfaced via the Popup Dashboard (nothing actively happening) plus OS notifications (section 26), since the Sync Screen specifically represents "a commit is in flight right now."
+
+---
+
 # 24. Settings Screen
 
 ```text
@@ -875,6 +897,17 @@ Sync Failed:
 
 Click to Retry.
 ```
+
+---
+
+## Implementation Notes
+
+Built in `notifications/index.ts` via `chrome.notifications.create`. Two deliberate deviations from the illustrative templates above:
+
+* **No notification per phase-1 immediate retry.** The 5 immediate attempts are expected to resolve within seconds; notifying on every one would spam the user for what's usually a transient blip. A Retry notification only fires when escalating into phase 2 or phase 3 — i.e. when there's an actual multi-minute-or-longer wait worth surfacing.
+* **Delay units are minutes/hours, not literal seconds** — "Next attempt in 30 minutes." / "Next attempt in 2 hours." — since the real intervals (section 19) are 30 minutes and 2 hours, not the illustrative 30 seconds shown above.
+
+All three notification types share one notification id per queue item (`algoledger:sync:{itemId}`), so a later notification replaces an earlier one in place instead of stacking duplicates. Clicking a Retry or Failure notification calls `retryQueueItemNow(itemId)` (wired via `chrome.notifications.onClicked` in `background/index.ts`).
 
 ---
 
