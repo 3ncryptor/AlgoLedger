@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build --config vite.injected.config.ts && vite build",
+    "build:firefox": "vite build --config vite.injected.config.ts && vite build --config vite.firefox.config.ts && vite build --config vite.firefox.bg.config.ts && vite build --config vite.firefox.cs.config.ts && node scripts/write-firefox-manifest.mjs",
     "lint": "eslint . --ignore-pattern public/**",
     "type-check": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
