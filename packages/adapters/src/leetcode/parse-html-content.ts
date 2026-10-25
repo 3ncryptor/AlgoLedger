@@ -1,6 +1,18 @@
 const EXAMPLE_MARKER = /<strong class="example">Example \d+:<\/strong>/gi
 const CONSTRAINTS_MARKER = /<p>\s*<strong>\s*Constraints:\s*<\/strong>\s*<\/p>/i
 
+function cleanHtmlText(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .trim()
+}
+
 export interface ParsedStatement {
   statement: string
   examples: string[]
@@ -20,12 +32,17 @@ export function parseHtmlContent(html: string): ParsedStatement {
     firstExampleIndex === undefined
       ? beforeConstraints
       : beforeConstraints.slice(0, firstExampleIndex)
-  ).trim()
+  )
+    .replace(/<p>\s*$/i, '')
+    .trim()
 
   const examples = exampleMarkers.map((marker, index) => {
     const start = (marker.index ?? 0) + marker[0].length
     const end = exampleMarkers[index + 1]?.index ?? beforeConstraints.length
-    return beforeConstraints.slice(start, end).trim()
+    const raw = beforeConstraints.slice(start, end)
+    const preMatch = /<pre>([\s\S]*?)<\/pre>/i.exec(raw)
+    const content = preMatch?.[1] ?? raw
+    return cleanHtmlText(content)
   })
 
   const listMatch = /<ul>([\s\S]*?)<\/ul>/i.exec(afterConstraints)

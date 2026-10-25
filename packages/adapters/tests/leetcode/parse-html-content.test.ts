@@ -12,11 +12,14 @@ describe('parseHtmlContent', () => {
     expect(result.statement).not.toContain('Example 1')
   })
 
-  test('splits all three real examples into separate entries', () => {
+  test('splits all three real examples into separate entries and strips raw HTML tags', () => {
     const result = parseHtmlContent(TWO_SUM_CONTENT)
 
     expect(result.examples).toHaveLength(3)
     expect(result.examples[0]).toContain('nums = [2,7,11,15]')
+    expect(result.examples[0]).not.toContain('<pre>')
+    expect(result.examples[0]).not.toContain('</p>')
+    expect(result.examples[0]).not.toContain('<strong>')
     expect(result.examples[1]).toContain('nums = [3,2,4]')
     expect(result.examples[2]).toContain('nums = [3,3]')
   })
